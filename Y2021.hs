@@ -3,6 +3,8 @@ module Y2021
   , d01b
   , d02a
   , d02b
+  , d03a
+  , d03b
   ) where
 
 import qualified Data.Char as Char
@@ -59,3 +61,45 @@ d02b :: FilePath -> IO Int
 d02b input = do
   (h, d, _) <- travel input moveB (0, 0, 0)
   return $ h * d
+
+bin2int :: Num a => [a] -> a
+bin2int ints =
+  sum [b * r | (b, r) <- zip (reverse ints) [2 ^ n | n <- [0..]]]
+
+mostCommonBit :: [[Int]] -> [Int]
+mostCommonBit bs =
+  let count1s = foldl1 (\a b -> [x + y | (x, y) <- zip a b]) bs
+      len = length bs
+  in [if n >= div (len + 1) 2 then 1 else 0 | n <- count1s]
+
+readBits :: FilePath -> IO [[Int]]
+readBits input = do
+  str <- Input.s input
+  return $ map (map Char.digitToInt) str
+
+d03a :: FilePath -> IO Int
+d03a input = do
+  report <- readBits input
+  let mcb = mostCommonBit report
+      gamma = bin2int mcb
+      epsilon = bin2int [1 - b | b <- mcb]
+  return $ gamma * epsilon
+
+filterMcb :: ([[Int]] -> [Int]) -> [[Int]] -> Int -> [Int]
+filterMcb f nums i
+  | (length nums) == 1 = nums !! 0
+  | otherwise =
+    let mcb = f nums
+        next = filter (\bs -> (bs !! i) == (mcb !! i)) nums
+    in filterMcb f next (i + 1)
+
+leastCommonBit :: [[Int]] -> [Int]
+leastCommonBit bs =
+  [1 - b | b <- mostCommonBit bs]
+
+d03b :: FilePath -> IO Int
+d03b input = do
+  report <- readBits input
+  let ogr = filterMcb mostCommonBit report 0
+      csr = filterMcb leastCommonBit report 0
+  return $ (bin2int ogr) * (bin2int csr)
