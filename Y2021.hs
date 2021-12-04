@@ -5,9 +5,12 @@ module Y2021
   , d02b
   , d03a
   , d03b
+  , d04a
+  , d04b
   ) where
 
 import qualified Data.Char as Char
+import qualified Data.Set as Set
 import qualified Input
 
 countIncreases :: (Ord a, Num b) => [a] -> b
@@ -103,3 +106,64 @@ d03b input = do
   let ogr = filterMcb mostCommonBit report 0
       csr = filterMcb leastCommonBit report 0
   return $ (bin2int ogr) * (bin2int csr)
+
+bingoNums :: String -> [Int]
+bingoNums line =
+  map read $ words [if c == ',' then ' ' else c | c <- line]
+
+type Board = [Set.Set Int]
+
+boardFromList :: [String] -> Board
+boardFromList lst =
+  let nums = map bingoNums lst
+      rows = map Set.fromList nums
+      cols = map Set.fromList [[row !! n | row <- nums] | n <- [0..4]]
+  in rows ++ cols
+
+boardsFromInput :: [String] -> [Board]
+boardsFromInput ls
+  | length ls < 5 = []
+  | otherwise =
+  let (b, remaining) = splitAt 5 ls
+  in (boardFromList b):(boardsFromInput remaining)
+
+boardIsWinner :: Set.Set Int -> Board -> Bool
+boardIsWinner ns b =
+  any (\s -> 5 == length (Set.intersection s ns)) b
+
+boardScore :: Board -> [Int] -> Int
+boardScore b called =
+  let ns = Set.fromList called
+  in (last called) * (sum $ Set.unions $ map (\w -> Set.difference w ns) b)
+
+findBingoWinner :: [Board] -> [Int] -> Int -> Int
+findBingoWinner bs called at =
+  let ns = Set.fromList (take at called)
+      winners = filter (boardIsWinner ns) bs
+  in if length winners > 0 then
+       boardScore (winners !! 0) (take at called)
+     else
+       findBingoWinner bs called (at + 1)
+
+findLastBingoWinner :: [Board] -> [Int] -> Int -> Int
+findLastBingoWinner bs called at =
+  let ns = Set.fromList (take at called)
+      losers = filter (\b -> not (boardIsWinner ns b)) bs
+  in if length losers == 1 then
+       findBingoWinner losers called (at + 1)
+    else
+       findLastBingoWinner losers called (at + 1)
+
+d04a :: FilePath -> IO Int
+d04a input = do
+  (numsStr:_:boardStrs) <- Input.s input
+  let nums = bingoNums numsStr
+      boards = boardsFromInput [b | b <- boardStrs, b /= ""]
+  return $ findBingoWinner boards nums 1
+
+d04b :: FilePath -> IO Int
+d04b input = do
+  (numsStr:_:boardStrs) <- Input.s input
+  let nums = bingoNums numsStr
+      boards = boardsFromInput [b | b <- boardStrs, b /= ""]
+  return $ findLastBingoWinner boards nums 1
