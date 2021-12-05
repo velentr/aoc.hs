@@ -7,9 +7,12 @@ module Y2021
   , d03b
   , d04a
   , d04b
+  , d05a
+  , d05b
   ) where
 
 import qualified Data.Char as Char
+import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Input
 
@@ -167,3 +170,52 @@ d04b input = do
   let nums = bingoNums numsStr
       boards = boardsFromInput [b | b <- boardStrs, b /= ""]
   return $ findLastBingoWinner boards nums 1
+
+data LineSegment = Vertical Int (Int, Int)
+                 | Horizontal (Int, Int) Int
+                 | Diagonal (Int, Int) (Int, Int) deriving Show
+type LineMap = Map.Map (Int, Int) Int
+
+parseLineSegment :: String -> LineSegment
+parseLineSegment s
+  | x0 == x1 = Vertical x0 (y0, y1)
+  | y0 == y1 = Horizontal (x0, x1) y0
+  | otherwise = Diagonal (x0, y0) (x1, y1)
+  where [x0, y0, x1, y1] =
+          map read $ words [if Char.isDigit c then c else ' ' | c <- s]
+
+notDiagonal :: LineSegment -> Bool
+notDiagonal (Diagonal _ _) = False
+notDiagonal _ = True
+
+range :: (Enum a, Ord a) => a -> a -> [a]
+range n m
+  | n > m = reverse [m..n]
+  | otherwise = [n..m]
+
+markPoint :: Int -> Int -> LineMap -> LineMap
+markPoint x y m =
+  Map.insert (x, y) (1 + Map.findWithDefault 0 (x, y) m) m
+
+markLineSegment :: LineMap -> LineSegment -> LineMap
+markLineSegment m0 (Vertical x (y0, y1)) =
+  foldl (\m y -> markPoint x y m) m0 $ range y0 y1
+markLineSegment m0 (Horizontal (x0, x1) y) =
+  foldl (\m x -> markPoint x y m) m0 $ range x0 x1
+markLineSegment m0 (Diagonal (x0, y0) (x1, y1)) =
+  let points = zip (range x0 x1) (range y0 y1) in
+  foldl (\m (x, y) -> markPoint x y m) m0 points
+
+d05a :: FilePath -> IO Int
+d05a input = do
+  lineSegmentStrs <- Input.s input
+  let lineSegments = map parseLineSegment lineSegmentStrs
+      m = foldl markLineSegment Map.empty $ filter notDiagonal lineSegments
+  return $ Map.size $ Map.filter (\v -> v >= 2) m
+
+d05b :: FilePath -> IO Int
+d05b input = do
+  lineSegmentStrs <- Input.s input
+  let lineSegments = map parseLineSegment lineSegmentStrs
+      m = foldl markLineSegment Map.empty lineSegments
+  return $ Map.size $ Map.filter (\v -> v >= 2) m
