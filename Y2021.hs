@@ -9,12 +9,15 @@ module Y2021
   , d04b
   , d05a
   , d05b
+  , d06a
+  , d06b
   ) where
 
 import qualified Data.Char as Char
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Input
+import qualified System.IO as IO
 
 countIncreases :: (Ord a, Num b) => [a] -> b
 countIncreases nums =
@@ -219,3 +222,26 @@ d05b input = do
   let lineSegments = map parseLineSegment lineSegmentStrs
       m = foldl markLineSegment Map.empty lineSegments
   return $ Map.size $ Map.filter (\v -> v >= 2) m
+
+parseLanternFish :: FilePath -> IO [Int]
+parseLanternFish input = do
+  contents <- IO.readFile input
+  let ages = [read n |
+              n <- words [if Char.isDigit c then c else ' ' | c <- contents]]
+      counts = foldl (\m n -> Map.insert n (1 + Map.findWithDefault 0 n m) m) Map.empty ages
+  return [Map.findWithDefault 0 n counts | n <- [0..8]]
+
+stepGeneration :: [Int] -> [Int]
+stepGeneration (numOldies:others) =
+  let gen6 = (others !! 6) + numOldies in
+    (take 6 others) ++ [gen6, others !! 7, numOldies]
+
+d06a :: FilePath -> IO Int
+d06a input = do
+  gen0 <- parseLanternFish input
+  return $ sum $ foldl (\g _ -> stepGeneration g) gen0 [1..80]
+
+d06b :: FilePath -> IO Int
+d06b input = do
+  gen0 <- parseLanternFish input
+  return $ sum $ foldl (\g _ -> stepGeneration g) gen0 [1..256]
