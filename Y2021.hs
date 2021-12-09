@@ -15,6 +15,8 @@ module Y2021
   , d07b
   , d08a
   , d08b
+  , d09a
+  , d09b
   ) where
 
 import qualified Data.Char as Char
@@ -388,3 +390,57 @@ d08b input = do
   notes <- Input.s input
   let displays = map parseSegmentLine notes
   return $ sum [decodeSegment patterns display | (patterns, display) <- displays]
+
+type HeightMap = Map.Map (Int, Int) Int
+
+getHeight :: HeightMap -> Int -> Int -> Int
+getHeight m x y =
+  Map.findWithDefault 10 (x, y) m
+
+isLowPoint :: HeightMap -> Int -> Int -> Bool
+isLowPoint m x y =
+  let h = getHeight m x y in
+    and [h < getHeight m (x - 1) y,
+         h < getHeight m x (y - 1),
+         h < getHeight m (x + 1) y,
+         h < getHeight m x (y + 1)]
+
+getLowPoints :: HeightMap -> [(Int, Int)]
+getLowPoints m =
+  Map.keys $ Map.filterWithKey (\(x, y) _ -> isLowPoint m x y) m
+
+heightMapRow :: (Int, String) -> HeightMap
+heightMapRow (y, row) =
+  foldl (\m (x, c) -> Map.insert (x, y) (Char.digitToInt c) m) Map.empty $ zip [0..] row
+
+riskLevel :: HeightMap -> Int -> Int -> Int
+riskLevel m x y =
+  1 + (getHeight m x y)
+
+readHeightMap :: FilePath -> IO HeightMap
+readHeightMap input = do
+  rows <- Input.s input
+  return $ Map.unions [heightMapRow r | r <- zip [0..] rows]
+
+d09a :: FilePath -> IO Int
+d09a input = do
+  hm <- readHeightMap input
+  return $ sum [riskLevel hm x y | (x, y) <- getLowPoints hm]
+
+type Basin = Set.Set (Int, Int)
+
+growBasin :: HeightMap -> Basin -> [(Int, Int)] -> Basin
+growBasin _ b [] = b
+growBasin hm b ((x, y):rest)
+  | ph > 8 || Set.member (x, y) b = growBasin hm b rest
+  | otherwise =
+    growBasin hm (Set.insert (x, y) b) ((x, y+1):(x+1, y):(x, y-1):(x-1, y):rest)
+  where ph = getHeight hm x y
+
+d09b :: FilePath -> IO Int
+d09b input = do
+  hm <- readHeightMap input
+  let lps = getLowPoints hm
+      basins = [growBasin hm Set.empty [lp] | lp <- lps]
+      (b0:b1:b2:_) = reverse $ List.sort [Set.size basin | basin <- basins]
+  return $ b0 * b1 * b2
