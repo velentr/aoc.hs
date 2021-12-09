@@ -1,4 +1,5 @@
 import qualified Data.Char as Char
+import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified System.IO as IO
@@ -29,6 +30,10 @@ allTests = TestList [TestLabel day $ TestCase (testDay f day) |
                                  , (Y2021.d05b, "2021-05b")
                                  , (Y2021.d06a, "2021-06a")
                                  , (Y2021.d06b, "2021-06b")
+                                 , (Y2021.d07a, "2021-07a")
+                                 , (Y2021.d07b, "2021-07b")
+                                 , (Y2021.d08a, "2021-08a")
+                                 , (Y2021.d08b, "2021-08b")
                                  ]]
 
 main :: IO ()
