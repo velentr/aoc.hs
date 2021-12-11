@@ -19,6 +19,8 @@ module Y2021
   , d09b
   , d10a
   , d10b
+  , d11a
+  , d11b
   ) where
 
 import qualified Data.Char as Char
@@ -411,18 +413,23 @@ getLowPoints :: HeightMap -> [(Int, Int)]
 getLowPoints m =
   Map.keys $ Map.filterWithKey (\(x, y) _ -> isLowPoint m x y) m
 
-heightMapRow :: (Int, String) -> HeightMap
-heightMapRow (y, row) =
+type NumberGrid = Map.Map (Int, Int) Int
+
+numberRow :: (Int, String) -> NumberGrid
+numberRow (y, row) =
   foldl (\m (x, c) -> Map.insert (x, y) (Char.digitToInt c) m) Map.empty $ zip [0..] row
+
+readNumberGrid :: FilePath -> IO NumberGrid
+readNumberGrid input = do
+  rows <- Input.s input
+  return $ Map.unions [numberRow r | r <- zip [0..] rows]
 
 riskLevel :: HeightMap -> Int -> Int -> Int
 riskLevel m x y =
   1 + (getHeight m x y)
 
 readHeightMap :: FilePath -> IO HeightMap
-readHeightMap input = do
-  rows <- Input.s input
-  return $ Map.unions [heightMapRow r | r <- zip [0..] rows]
+readHeightMap = readNumberGrid
 
 d09a :: FilePath -> IO Int
 d09a input = do
@@ -540,3 +547,55 @@ d10b input = do
   ls <- Input.s input
   let incompletes = [l | l <- ls, parseScore l == 0]
   return $ median [completionScore incomplete | incomplete <- incompletes]
+
+activateNeighbors :: NumberGrid -> (Int, Int) -> NumberGrid
+activateNeighbors m (x, y) =
+  let neighbors = [(x+1, y)
+                  ,(x+1, y+1)
+                  ,(x,   y+1)
+                  ,(x-1, y+1)
+                  ,(x-1, y)
+                  ,(x-1, y-1)
+                  ,(x,   y-1)
+                  ,(x+1, y-1)
+                  ]
+  in
+    foldl (\m' (x', y') -> activateOctopus m' (x', y')) m neighbors
+
+activateOctopus :: NumberGrid -> (Int, Int) -> NumberGrid
+activateOctopus m (x, y) =
+  case Map.lookup (x, y) m of
+    Just 10 -> m
+    Just 9 ->
+      let m' = Map.insert (x, y) 10 m in
+        activateNeighbors m' (x, y)
+    Just n ->
+      Map.insert (x, y) (n + 1) m
+    Nothing -> m
+
+stepOctopi :: (NumberGrid, Int) -> (NumberGrid, Int)
+stepOctopi (m, n) =
+  let m' = Map.map ((+) 1) m
+      hiEnergy = Map.keys $ Map.filter ((==) 10) m'
+      m'' = foldl activateNeighbors m' hiEnergy
+      flashed = Map.size $ Map.filter ((==) 10) m''
+  in
+    (Map.map (\energy -> if energy == 10 then 0 else energy) m'', n + flashed)
+
+d11a :: FilePath -> IO Int
+d11a input = do
+  m <- readNumberGrid input
+  let (_, totalFlashes) = foldl (\m' _ -> stepOctopi m') (m, 0) [1..100]
+  return totalFlashes
+
+checkAllFlashed :: NumberGrid -> Int -> Int
+checkAllFlashed m step =
+  let (m', numFlashed) = stepOctopi (m, 0) in
+    if numFlashed == Map.size m' then
+      step
+    else
+      checkAllFlashed m' (step + 1)
+
+d11b input = do
+  m <- readNumberGrid input
+  return $ checkAllFlashed m 1
