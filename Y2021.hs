@@ -17,6 +17,8 @@ module Y2021
   , d08b
   , d09a
   , d09b
+  , d10a
+  , d10b
   ) where
 
 import qualified Data.Char as Char
@@ -444,3 +446,97 @@ d09b input = do
       basins = [growBasin hm Set.empty [lp] | lp <- lps]
       (b0:b1:b2:_) = reverse $ List.sort [Set.size basin | basin <- basins]
   return $ b0 * b1 * b2
+
+data ParseResult = Ok String | Error Int | Incomplete String
+
+isChunkOpener :: Char -> Bool
+isChunkOpener '(' = True
+isChunkOpener '[' = True
+isChunkOpener '{' = True
+isChunkOpener '<' = True
+isChunkOpener _ = False
+
+chunkMatches :: Char -> Char -> Bool
+chunkMatches '(' ')' = True
+chunkMatches '[' ']' = True
+chunkMatches '{' '}' = True
+chunkMatches '<' '>' = True
+chunkMatches _ _ = False
+
+chunkErrorScore :: Char -> Int
+chunkErrorScore ')' = 3
+chunkErrorScore ']' = 57
+chunkErrorScore '}' = 1197
+chunkErrorScore '>' = 25137
+chunkErrorScore _ = error "invalid chunk closer"
+
+chunkComplement :: Char -> Char
+chunkComplement '(' = ')'
+chunkComplement '[' = ']'
+chunkComplement '{' = '}'
+chunkComplement '<' = '>'
+chunkComplement _ = error "invalid chunk opener"
+
+parseChunk :: String -> ParseResult
+parseChunk [] = Ok []
+parseChunk (c:rest)
+  | isChunkOpener c =
+    case parseChunks rest of
+      Error score -> Error score
+      Ok [] -> Incomplete [chunkComplement c]
+      Ok (c':remaining) ->
+        if chunkMatches c c' then
+          Ok remaining
+        else
+          Error (chunkErrorScore c')
+      Incomplete required -> Incomplete ((chunkComplement c):required)
+  | otherwise = Error (chunkErrorScore c)
+
+parseChunks :: String -> ParseResult
+parseChunks [] = Ok []
+parseChunks (c:rest)
+  | isChunkOpener c =
+    case parseChunk (c:rest) of
+      Ok remaining -> parseChunks remaining
+      Error score -> Error score
+      Incomplete required -> Incomplete required
+  | otherwise = Ok (c:rest)
+
+parseScore :: String -> Int
+parseScore s =
+  case parseChunk s of
+    Ok [] -> 0
+    Ok remaining -> parseScore remaining
+    Incomplete _ -> 0
+    Error score -> score
+
+d10a :: FilePath -> IO Int
+d10a input = do
+  ls <- Input.s input
+  return $ sum [parseScore l | l <- ls]
+
+chunkIncompleteScore :: Char -> Int
+chunkIncompleteScore ')' = 1
+chunkIncompleteScore ']' = 2
+chunkIncompleteScore '}' = 3
+chunkIncompleteScore '>' = 4
+chunkIncompleteScore _ = error "invalid chunk closer"
+
+incompleteChunkScore :: String -> Int -> Int
+incompleteChunkScore [] score = score
+incompleteChunkScore (c:cs) score =
+  incompleteChunkScore cs (5*score + chunkIncompleteScore c)
+
+completionScore :: String -> Int
+completionScore s =
+  case parseChunk s of
+    Ok remaining -> completionScore remaining
+    Incomplete required ->
+      incompleteChunkScore (reverse required) 0
+    _ -> error "invalid completion?"
+
+d10b :: FilePath -> IO Int
+d10b input = do
+  ls <- Input.s input
+  let incompletes = [l | l <- ls, parseScore l == 0]
+  return $ median [completionScore incomplete | incomplete <- incompletes]

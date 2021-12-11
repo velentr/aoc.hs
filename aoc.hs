@@ -36,6 +36,8 @@ allTests = TestList [TestLabel day $ TestCase (testDay f day) |
                                  , (Y2021.d08b, "2021-08b")
                                  , (Y2021.d09a, "2021-09a")
                                  , (Y2021.d09b, "2021-09b")
+                                 , (Y2021.d10a, "2021-10a")
+                                 , (Y2021.d10b, "2021-10b")
                                  ]]
 
 main :: IO ()
