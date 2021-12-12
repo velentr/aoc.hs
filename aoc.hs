@@ -5,7 +5,9 @@ import qualified Data.Set as Set
 import qualified System.IO as IO
 import Test.HUnit
 
+import qualified Graph
 import qualified Input
+import qualified Queue
 
 import qualified Y2021
 
@@ -40,6 +42,8 @@ allTests = TestList [TestLabel day $ TestCase (testDay f day) |
                                  , (Y2021.d10b, "2021-10b")
                                  , (Y2021.d11a, "2021-11a")
                                  , (Y2021.d11b, "2021-11b")
+                                 , (Y2021.d12a, "2021-12a")
+                                 , (Y2021.d12b, "2021-12b")
                                  ]]
 
 main :: IO ()

@@ -21,14 +21,19 @@ module Y2021
   , d10b
   , d11a
   , d11b
+  , d12a
+  , d12b
   ) where
 
 import qualified Data.Char as Char
 import qualified Data.List as List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import qualified Input
 import qualified System.IO as IO
+
+import qualified Graph
+import qualified Input
+import qualified Queue
 
 countIncreases :: (Ord a, Num b) => [a] -> b
 countIncreases nums =
@@ -596,6 +601,74 @@ checkAllFlashed m step =
     else
       checkAllFlashed m' (step + 1)
 
+d11b :: FilePath -> IO Int
 d11b input = do
   m <- readNumberGrid input
   return $ checkAllFlashed m 1
+
+parseGraph :: FilePath -> IO (Graph.Graph String)
+parseGraph input = do
+  ls <- Input.s input
+  let edges = [(v0, v1) | l <- ls,
+               let [v0, v1] = words [if Char.isAlpha c then c else ' ' | c <- l]]
+      g = Graph.fromList edges
+  return $ foldl Graph.addEdge g [(v1, v0) | (v0, v1) <- edges]
+
+type Cave = String
+type Path = [Cave]
+type Paths = Set.Set Path
+
+isSmallCave :: Cave -> Bool
+isSmallCave "" = error "empty cave name?"
+isSmallCave (c:_) = Char.isAsciiLower c
+
+isInList :: (Eq a) => a -> [a] -> Bool
+isInList elt l =
+  List.any ((==) elt) l
+
+canVisitA :: Cave -> Path -> Bool
+canVisitA v path =
+  (not $ isSmallCave v) || (not $ isInList v path)
+
+hasDuplicateCave :: Path -> Bool
+hasDuplicateCave p =
+  let smallCaves = filter isSmallCave p
+      uniq = Set.fromList smallCaves
+  in Set.size uniq /= length smallCaves
+
+canVisitB :: Cave -> Path -> Bool
+canVisitB "start" [] = True
+canVisitB "start" _ = False
+canVisitB v path =
+  (not $ isSmallCave v) || (not $ isInList v path) || (not $ hasDuplicateCave path)
+
+findPathsStep :: Graph.Graph Cave -> (Cave -> Path -> Bool) -> Queue.Queue (Cave, Path) -> Paths -> Paths
+findPathsStep g canVisit q soFar =
+  let (it, q') = Queue.pop' q in
+    case it of
+      Nothing -> soFar
+      Just ("end", path) ->
+        findPathsStep g canVisit q' $ Set.insert path soFar
+      Just (v, path) ->
+        if not $ canVisit v path then
+          findPathsStep g canVisit q' soFar
+        else
+          let neighbors = Graph.neighbors g v
+              path' = v:path
+              q'' = foldl Queue.push q' [(n, path') | n <- Set.toList neighbors]
+          in findPathsStep g canVisit q'' soFar
+
+findPaths :: Graph.Graph Cave -> (Cave -> Path -> Bool) -> Paths
+findPaths g canVisit =
+  findPathsStep g canVisit (Queue.fromList [("start", [])]) Set.empty
+
+d12a :: FilePath -> IO Int
+d12a input = do
+  g <- parseGraph input
+  return $ Set.size $ findPaths g canVisitA
+
+-- SLOW
+d12b :: FilePath -> IO Int
+d12b input = do
+  g <- parseGraph input
+  return $ Set.size $ findPaths g canVisitB
