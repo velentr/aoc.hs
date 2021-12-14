@@ -23,6 +23,8 @@ module Y2021
   , d11b
   , d12a
   , d12b
+  , d13a
+  , d13b
   ) where
 
 import qualified Data.Char as Char
@@ -672,3 +674,70 @@ d12b :: FilePath -> IO Int
 d12b input = do
   g <- parseGraph input
   return $ Set.size $ findPaths g canVisitB
+
+type Dots = Set.Set (Int, Int)
+
+splitOnBlank :: FilePath -> IO ([String], [String])
+splitOnBlank input = do
+  l <- Input.s input
+  let (dots, ("":folds)) = break ((==) "") l
+  return (dots, folds)
+
+parseDots :: [String] -> [(Int, Int)]
+parseDots dots =
+  [(read x, read y) | xy <- dots, let (x, (',':y)) = break ((==) ',') xy]
+
+data Fold = AlongX Int | AlongY Int deriving Show
+
+parseFold :: String -> Fold
+parseFold ('f':'o':'l':'d':' ':'a':'l':'o':'n':'g':' ':'y':'=':y) = AlongY (read y)
+parseFold ('f':'o':'l':'d':' ':'a':'l':'o':'n':'g':' ':'x':'=':x) = AlongX (read x)
+parseFold _ = error "invalid fold?"
+
+parseFolds :: [String] -> [Fold]
+parseFolds = map parseFold
+
+parseDotFolds :: FilePath -> IO (Dots, [Fold])
+parseDotFolds input = do
+  (d, f) <- splitOnBlank input
+  return (Set.fromList $ parseDots d, parseFolds f)
+
+executeFold :: Dots -> Fold -> Dots
+executeFold dots (AlongY y) =
+  Set.map (\(x0, y0) -> (x0, if y0 > y then 2*y - y0 else y0)) dots
+executeFold dots (AlongX x) =
+  Set.map (\(x0, y0) -> (if x0 > x then 2*x - x0 else x0, y0)) dots
+
+d13a :: FilePath -> IO Int
+d13a input = do
+  (dots, folds) <- parseDotFolds input
+  return $ Set.size $ executeFold dots $ head folds
+
+maxXY :: Dots -> (Int, Int)
+maxXY dots =
+  Set.foldl (\(maxX, maxY) (x, y) ->
+               (if x > maxX then x else maxX,
+                if y > maxY then y else maxY)) (0, 0) dots
+
+putDot :: Dots -> Int -> Int -> IO ()
+putDot dots x y =
+  if Set.member (x, y) dots then
+    putChar '#'
+  else
+    putChar '.'
+
+putRow :: Dots -> Int -> Int -> IO ()
+putRow dots y maxX = do
+  sequence_ $ (map (\x -> putDot dots x y) [0..maxX]) ++ [(putStrLn "")]
+
+printDots :: Dots -> Int -> Int -> IO ()
+printDots dots maxX maxY = do
+  mapM_ (\y -> putRow dots y maxX) [0..maxY]
+
+-- how to test?
+d13b :: FilePath -> IO ()
+d13b input = do
+  (dots, folds) <- parseDotFolds input
+  let dots' = foldl executeFold dots folds
+      (maxX, maxY) = maxXY dots'
+  printDots dots' maxX maxY
