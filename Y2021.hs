@@ -25,6 +25,8 @@ module Y2021
   , d12b
   , d13a
   , d13b
+  , d14a
+  , d14b
   ) where
 
 import qualified Data.Char as Char
@@ -741,3 +743,62 @@ d13b input = do
   let dots' = foldl executeFold dots folds
       (maxX, maxY) = maxXY dots'
   printDots dots' maxX maxY
+
+type Insertions = Map.Map (Char, Char) Char
+type Polymer = Map.Map (Char, Char) Int
+
+parseInsertion :: Insertions -> String -> Insertions
+parseInsertion m (i0:i1:' ':'-':'>':' ':o:[]) = Map.insert (i0, i1) o m
+parseInsertion _ _ = error "invalid insertion sequence?"
+
+parsePolymer :: String -> Polymer
+parsePolymer p =
+  countAll $ zip p $ tail p
+
+insertPair :: Polymer -> Insertions -> (Char, Char) -> Int -> Polymer
+insertPair pSoFar m (c0, c1) count =
+  let Just c = Map.lookup (c0, c1) m
+      p' = Map.insert (c0, c) (count + Map.findWithDefault 0 (c0, c) pSoFar) pSoFar
+      p'' = Map.insert (c, c1) (count + Map.findWithDefault 0 (c, c1) p') p'
+  in p''
+
+insertPolymer :: Polymer -> Insertions -> Polymer
+insertPolymer p m =
+  Map.foldlWithKey (\p' pair count -> insertPair p' m pair count) Map.empty p
+
+countAll :: (Ord a) => [a] -> Map.Map a Int
+countAll elts =
+  foldl (\m elt -> Map.insert elt (1 + Map.findWithDefault 0 elt m) m) Map.empty elts
+
+countPair :: Map.Map Char Int -> (Char, Char) -> Int -> Map.Map Char Int
+countPair m (c0, c1) count =
+  let m' = Map.insert c0 (count + Map.findWithDefault 0 c0 m) m in
+  Map.insert c1 (count + Map.findWithDefault 0 c1 m') m'
+
+countElements :: Polymer -> Char -> Char -> Map.Map Char Int
+countElements p c0 cl =
+  let m = Map.foldlWithKey countPair Map.empty p in
+    Map.mapWithKey (\c count ->
+                      div
+                      (count + (if c == c0 then 1 else 0) +
+                       (if c == cl then 1 else 0)) 2) m
+
+expandPolymer :: Polymer -> Insertions -> Int -> Char -> Char -> Int
+expandPolymer template insertions iterations c0 cl =
+  let p = foldl (\polymer _ -> insertPolymer polymer insertions) template [1..iterations]
+      counts = countElements p c0 cl
+  in (maximum $ Map.elems counts) - (minimum $ Map.elems counts)
+
+d14a :: FilePath -> IO Int
+d14a input = do
+  ([templateStr], insertionStrs) <- splitOnBlank input
+  let template = parsePolymer templateStr
+      insertions = foldl parseInsertion Map.empty insertionStrs
+  return $ expandPolymer template insertions 10 (head templateStr) (last templateStr)
+
+d14b :: FilePath -> IO Int
+d14b input = do
+  ([templateStr], insertionStrs) <- splitOnBlank input
+  let template = parsePolymer templateStr
+      insertions = foldl parseInsertion Map.empty insertionStrs
+  return $ expandPolymer template insertions 40 (head templateStr) (last templateStr)
